@@ -1,0 +1,8 @@
+Library Statistics:
+=====================================
+Most popular book: The Ailment and the Cure (2 borrows)
+Most popular genre: Islamic
+Most popular author: Ibn Qayyim al-Jawziyya
+Total users: 9
+Total books: 11
+Total borrows: 8

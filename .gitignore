@@ -1,0 +1,11 @@
+# Ignore .env file
+.env
+
+# Ignore VSCode settings
+.vscode/
+
+# Ignore build artifacts
+*.class
+target/
+
+assets/Project_342_461.pdf
