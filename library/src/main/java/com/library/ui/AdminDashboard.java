@@ -1,7 +1,5 @@
 package com.library.ui;
-import java.sql.Connection;
-import java.sql.PreparedStatement;
-import java.sql.ResultSet;
+
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
 import com.library.dao.DatabaseConnection;
@@ -22,11 +20,14 @@ public class AdminDashboard extends JFrame {
     private JComboBox<String> authorComboBox;
     private JComboBox<Integer> yearComboBox;
     private JTextField searchField;
+    private JTextArea notificationArea;
 
     public AdminDashboard(User user) {
-        setTitle("Library Management System");
+        setTitle("Admin Dashboard");
         setSize(800, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        ImageIcon icon = new ImageIcon("assets/Book.png");
+        setIconImage(icon.getImage());
 
         // Main panel
         cardLayout = new CardLayout();
@@ -79,8 +80,6 @@ public class AdminDashboard extends JFrame {
         // search
         searchField = new JTextField(30);
         searchField.setText("Search for a book by title, author, or genre:");
-        searchField.setBackground(Library.gray);
-        searchField.setBorder(BorderFactory.createLineBorder(Color.BLACK)); 
         searchField.addFocusListener(new FocusListener() {
             @Override
             public void focusGained(FocusEvent e) {
@@ -118,11 +117,7 @@ public class AdminDashboard extends JFrame {
 
         // add a book button
         JButton addBookButton = new JButton("Add a Book");
-        addBookButton.setFont(Library.body);
-        addBookButton.setBackground(Library.darkGray);
-        addBookButton.setForeground(Color.WHITE);
-        addBookButton.setFocusable(false);
-        addBookButton.setBorderPainted(false);
+        Library.styleButton(addBookButton);
         addBookButton.addActionListener(e -> {
             String title = JOptionPane.showInputDialog("Enter the title of the book:");
             String author = JOptionPane.showInputDialog("Enter the author of the book:");
@@ -139,11 +134,7 @@ public class AdminDashboard extends JFrame {
 
         // remove book button
         JButton removeBookButton = new JButton("Remove a Book"); 
-        removeBookButton.setFont(Library.body);
-        removeBookButton.setBackground(Library.darkGray);
-        removeBookButton.setForeground(Color.WHITE);
-        removeBookButton.setFocusable(false);
-        removeBookButton.setBorderPainted(false);
+        Library.styleButton(removeBookButton);
         removeBookButton.addActionListener(e -> {
             int bookId = Integer.parseInt(JOptionPane.showInputDialog("Enter the ID of the book you want to remove:"));
             if (DatabaseConnection.deleteBook(bookId)) {
@@ -177,11 +168,7 @@ public class AdminDashboard extends JFrame {
 
         // report button
         JButton reportButton = new JButton("Generate Report For Library Statistics");
-        reportButton.setFont(Library.body);
-        reportButton.setBackground(Library.darkGray);
-        reportButton.setForeground(Color.WHITE);
-        reportButton.setFocusable(false);
-        reportButton.setBorderPainted(false);
+        Library.styleButton(reportButton);
         reportButton.addActionListener(e -> { DatabaseConnection.generateReport();});
 
         JPanel buttonPanel = new JPanel();
@@ -193,26 +180,20 @@ public class AdminDashboard extends JFrame {
         homePanel.add(buttonPanel);
 
         // notifications
-        JPanel notficationPanel = new JPanel();
+        JPanel notficationPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
 
-        JTextArea notificationArea = new JTextArea(10, 30);
+        notificationArea = new JTextArea(10, 30);
         notificationArea.setEditable(false);
+        notificationArea.setFont(Library.body);
+        displayNotifications();
 
-        notificationArea.append("BORROW HISTORY:\n");
-        Object[][] history = DatabaseConnection.borrowHistory();
-        for (Object[] row : history) {
-            notificationArea.append("User ID: " + row[0] + " | Borrowed: " + row[1] + 
-                                    " | on: " + row[2] + " | Due Date: " + row[3] + "\n");
-        }
-
-        notificationArea.append("\nOVERDUE BOOKS:\n");
-        Object[][] overdue = DatabaseConnection.overdueBooks();
-        for (Object[] row : overdue) {
-            notificationArea.append("User ID: " + row[0] + " | Borrowed Book: " 
-                                    + row[1] + " | Is OverDue: " + row[2] + "\n");
-        }
+        JButton refreshButton = new JButton("Refresh Notifications");
+        refreshButton.addActionListener(e -> {
+            displayNotifications();
+        });
 
         notficationPanel.add(notificationArea);
+        notficationPanel.add(refreshButton);
 
         // users
         JPanel usersPanel = new JPanel();
@@ -299,7 +280,7 @@ public class AdminDashboard extends JFrame {
         setVisible(true);
     }
 
-        class comboBoxListener implements ActionListener {
+    class comboBoxListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             String genre = (String) genreComboBox.getSelectedItem();
             String author = (String) authorComboBox.getSelectedItem();
@@ -314,6 +295,23 @@ public class AdminDashboard extends JFrame {
             String searchQuery = searchField.getText();
             Object[][] bookData = DatabaseConnection.searchBooks(searchQuery);
             tableModel.setDataVector(bookData, columnNames);
+        }
+    }
+
+    public void displayNotifications() {
+        notificationArea.append("BORROW HISTORY:\n");
+        Object[][] history = DatabaseConnection.borrowHistory();
+        for (Object[] row : history) {
+            notificationArea.append("User: " + row[0] + " | Borrowed: " + row[1] + 
+                                    " | on: " + row[2] + " | Due Date: " + row[3] +
+                                     "| Status: " + row[4] + "\n");
+        }
+
+        notificationArea.append("\nOVERDUE BOOKS:\n");
+        Object[][] overdue = DatabaseConnection.overdueBooks();
+        for (Object[] row : overdue) {
+            notificationArea.append("User: " + row[0] + " | Borrowed Book: " 
+                                    + row[1] + " | Is OverDue: " + row[2] + "\n");
         }
     }
 }

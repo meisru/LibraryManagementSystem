@@ -9,7 +9,6 @@ import java.sql.ResultSet;
 import com.library.dao.DatabaseConnection;
 import java.awt.event.*;
 import com.library.entities.User;
-import com.library.ui.Library;
 
 public class UserDashboard extends JFrame {
     private CardLayout cardLayout;
@@ -21,11 +20,14 @@ public class UserDashboard extends JFrame {
     private JComboBox<String> authorComboBox;
     private JComboBox<Integer> yearComboBox;
     private JTextField searchField;
+    private JTextArea notificationArea;
 
     public UserDashboard(User user) {
         setTitle("Library Management System");
         setSize(800, 500);
         setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+        ImageIcon icon = new ImageIcon("assets/Book.png");
+        setIconImage(icon.getImage());
 
         // Main panel
         cardLayout = new CardLayout();
@@ -117,11 +119,7 @@ public class UserDashboard extends JFrame {
 
         // borrow button
         JButton borrowButton = new JButton("Borrow Book");
-        borrowButton.setFont(Library.body);
-        borrowButton.setBackground(Library.darkGray);
-        borrowButton.setForeground(Color.WHITE);
-        borrowButton.setFocusable(false);
-        borrowButton.setBorderPainted(false);
+        Library.styleButton(borrowButton);
         borrowButton.addActionListener(e -> {
             int selectedRow = booksTable.getSelectedRow();
             if (selectedRow == -1) {
@@ -139,11 +137,7 @@ public class UserDashboard extends JFrame {
 
         // return button
         JButton returnButton = new JButton("Return Book");
-        returnButton.setFont(Library.body);
-        returnButton.setBackground(Library.darkGray);
-        returnButton.setForeground(Color.WHITE);
-        returnButton.setFocusable(false);
-        returnButton.setBorderPainted(false);
+        Library.styleButton(returnButton);
         returnButton.addActionListener(e -> {
             int selectedRow = booksTable.getSelectedRow();
             if (selectedRow == -1) {
@@ -175,11 +169,7 @@ public class UserDashboard extends JFrame {
 
         // report button
         JButton reportButton = new JButton("Generate Report For Library Statistics");
-        reportButton.setFont(Library.body);
-        reportButton.setBackground(Library.darkGray);
-        reportButton.setForeground(Color.WHITE);
-        reportButton.setFocusable(false);
-        reportButton.setBorderPainted(false);
+        Library.styleButton(reportButton);
         reportButton.addActionListener(e -> { DatabaseConnection.generateReport();});
 
         JPanel buttonPanel = new JPanel();
@@ -192,16 +182,13 @@ public class UserDashboard extends JFrame {
         // notifications
         JPanel notficationPanel = new JPanel();
 
-        JTextArea notificationArea = new JTextArea(10, 30);
+        notificationArea = new JTextArea(10, 30);
         notificationArea.setEditable(false);
+        notificationArea.setFont(Library.body);
 
-        notificationArea.append("BORROW HISTORY:\n");
-        Object[][] history = DatabaseConnection.borrowHistory(user.getUserId());
-        for (Object[] row : history) {
-            notificationArea.append("Book: " + row[0] + " | Borrowed on: " + row[1] + " | Due date: " + row[2] + "\n");
-        }
+        updateBorrowHistory(user);
 
-        notificationArea.append("OVERDUE BOOKS:\n");
+        notificationArea.append("\nOVERDUE BOOKS:\n");
         Object[][] overdue = DatabaseConnection.overdueBooks(user.getUserId());
         for (Object[] row : overdue) {
             notificationArea.append("Book: " + row[0] + " | Due date: " + row[1] + "\n");
@@ -233,7 +220,7 @@ public class UserDashboard extends JFrame {
         setVisible(true);
     }
 
-        class comboBoxListener implements ActionListener {
+    class comboBoxListener implements ActionListener {
         public void actionPerformed(ActionEvent e) {
             String genre = (String) genreComboBox.getSelectedItem();
             String author = (String) authorComboBox.getSelectedItem();
@@ -248,6 +235,15 @@ public class UserDashboard extends JFrame {
             String searchQuery = searchField.getText();
             Object[][] bookData = DatabaseConnection.searchBooks(searchQuery);
             tableModel.setDataVector(bookData, columnNames);
+        }
+    }
+
+    private void updateBorrowHistory(User user) {
+        notificationArea.setText("BORROW HISTORY:\n");
+        Object[][] history = DatabaseConnection.borrowHistory(user.getUserId());
+        for (Object[] row : history) {
+            notificationArea.append("Book: " + row[0] + " | Borrowed on: " + row[1] + " | Due date: " 
+                                    + row[2] + "| Status: " + row[3] + "\n");
         }
     }
 }

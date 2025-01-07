@@ -8,15 +8,12 @@ import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.util.ArrayList;
 import java.util.List;
-
 import javax.swing.JOptionPane;
-
 import org.springframework.security.crypto.bcrypt.BCrypt;
 import com.library.entities.User;
 import io.github.cdimascio.dotenv.Dotenv;
 
 public class DatabaseConnection {
-    // get a new database connection
     public static Connection getConnection() throws Exception {
         // Load .env file
         Dotenv dotenv = Dotenv.configure().directory("library/.env").load();
@@ -26,7 +23,7 @@ public class DatabaseConnection {
         return DriverManager.getConnection(url, user, password);
     }
 
-    // create a user
+    // Register a user
     public static boolean createUser(User user) {
         String query = "INSERT INTO users (username, password_hash, email) VALUES (?, ?, ?)";
         // Try-with-resources to auto-close the connection
@@ -62,7 +59,7 @@ public class DatabaseConnection {
         return false; // User not found or password mismatch
     }
 
-    // check if user exist
+    // check if username exist
     public static boolean userExists(String username) {
         String query = "SELECT * FROM users WHERE username = ?";
         try (Connection conn = getConnection();
@@ -295,7 +292,6 @@ public class DatabaseConnection {
                 hasConditions = true;
             }
         }
-        // Convert StringBuilder to String
         String query = queryBuilder.toString();
         Object[][] bookData = new Object[15][5]; 
         try (Connection conn = getConnection();
@@ -387,8 +383,8 @@ public class DatabaseConnection {
     // borrow a book
     public static boolean borrowBook(int userId, int bookId) {
         String checkAvailabilityQuery = "SELECT copies_available FROM books WHERE book_id = ?";
-        String borrowBookQuery = "INSERT INTO borrowing (user_id, book_id, borrow_date, return_date) " +
-                                 "VALUES (?, ?, CURRENT_DATE, CURRENT_DATE + INTERVAL '10 days');";
+        String borrowBookQuery = "INSERT INTO borrowing (user_id, book_id, borrow_date, return_date, status) " +
+                                 "VALUES (?, ?, CURRENT_DATE, CURRENT_DATE + INTERVAL '10 days', 'borrowed');";
         String decrementCopiesQuery = "UPDATE books "
                                 + "SET copies_available = copies_available - 1, "
                                 + "availability = CASE WHEN copies_available - 1 < 1 THEN 0 ELSE availability END "
@@ -471,7 +467,7 @@ public class DatabaseConnection {
 
     // borrow history
     public static Object[][] borrowHistory(int userId) {
-        String query = "SELECT b.book_name, br.borrow_date, br.return_date "
+        String query = "SELECT b.book_name, br.borrow_date, br.return_date, br.status "
         + "FROM books b "
         + "JOIN borrowing br ON b.book_id = br.book_id WHERE br.user_id = ?;";
         List<Object[]> history = new ArrayList<>();
@@ -483,7 +479,8 @@ public class DatabaseConnection {
                 history.add(new Object[]{
                     rs.getString("book_name"),
                     rs.getDate("borrow_date"),
-                    rs.getDate("return_date")
+                    rs.getDate("return_date"),
+                    rs.getString("status")
                 });
             }
         } catch (Exception e) {
@@ -492,20 +489,22 @@ public class DatabaseConnection {
         return history.toArray(new Object[0][0]);
     }
 
-        public static Object[][] borrowHistory() {
-        String query = "SELECT br.user_id, b.book_name, br.borrow_date, br.return_date "
-        + "FROM books b "
-        + "JOIN borrowing br ON b.book_id = br.book_id;";
+    public static Object[][] borrowHistory() {
+        String query = "SELECT u.username, b.book_name, br.borrow_date, br.return_date, br.status "
+                    + "FROM books b "
+                    + "JOIN borrowing br ON b.book_id = br.book_id "
+                    + "JOIN users u ON br.user_id = u.user_id;";
         List<Object[]> history = new ArrayList<>();
         try (Connection conn = getConnection();
             PreparedStatement ps = conn.prepareStatement(query)) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 history.add(new Object[]{
-                    rs.getInt("user_id"),
+                    rs.getString("username"),
                     rs.getString("book_name"),
                     rs.getDate("borrow_date"),
-                    rs.getDate("return_date")
+                    rs.getDate("return_date"),
+                    rs.getString("status")
                 });
             }
         } catch (Exception e) {
@@ -538,17 +537,18 @@ public class DatabaseConnection {
     }
 
     public static Object[][] overdueBooks() {
-        String query = "SELECT br.user_id, b.book_name, br.return_date "
+        String query = "SELECT u.username, b.book_name, br.return_date "
                     + "FROM books b "
                     + "JOIN borrowing br ON b.book_id = br.book_id "
-                    + "WHERE br.status = 'borrowed' AND br.return_date < CURRENT_DATE";
+                    + "JOIN users u ON br.user_id = u.user_id "
+                    + "WHERE br.status = 'borrowed' AND br.return_date < CURRENT_DATE;";
         List<Object[]> overdue = new ArrayList<>();
         try (Connection conn = getConnection();
             PreparedStatement ps = conn.prepareStatement(query)) {
             ResultSet rs = ps.executeQuery();
             while (rs.next()) {
                 overdue.add(new Object[]{
-                    rs.getInt("user_id"),
+                    rs.getString("username"),
                     rs.getString("book_name"),
                     rs.getDate("return_date")
                 });
@@ -561,56 +561,56 @@ public class DatabaseConnection {
 
     // report
     public static void generateReport() {
-                    String query = "SELECT " + 
-                                "    (SELECT books.book_name " + 
-                                "     FROM borrowing " + 
-                                "     JOIN books ON borrowing.book_id = books.book_id " + 
-                                "     GROUP BY books.book_id, books.book_name " + 
-                                "     ORDER BY COUNT(borrowing.book_id) DESC " + 
-                                "     LIMIT 1) AS most_popular_book, " + 
-                                "    (SELECT COUNT(borrowing.book_id) " + 
-                                "     FROM borrowing " + 
-                                "     GROUP BY borrowing.book_id " + 
-                                "     ORDER BY COUNT(borrowing.book_id) DESC " + 
-                                "     LIMIT 1) AS most_popular_book_count, " +
-                                "(SELECT books.genre " + 
-                                "     FROM borrowing " + 
-                                "     JOIN books ON borrowing.book_id = books.book_id " + 
-                                "     GROUP BY books.genre " + 
-                                "     ORDER BY COUNT(borrowing.book_id) DESC " + 
-                                "     LIMIT 1) AS most_popular_genre," +
-                                "(SELECT books.author " + 
-                                "     FROM borrowing " + 
-                                "     JOIN books ON borrowing.book_id = books.book_id " + 
-                                "     GROUP BY books.author " + 
-                                "     ORDER BY COUNT(borrowing.book_id) DESC " + 
-                                "     LIMIT 1) AS most_popular_author," +
-                                "    (SELECT COUNT(*) FROM users) AS total_users, " + 
-                                "    (SELECT COUNT(*) FROM books) AS total_books," + 
-                                "    (SELECT COUNT(*) FROM borrowing) AS total_borrows;";
-            try (Connection conn = DatabaseConnection.getConnection();
-            PreparedStatement preparedStatement = conn.prepareStatement(query)) {
-                ResultSet rs = preparedStatement.executeQuery();
-                rs.next();
-                String mostPopularBook = rs.getString("most_popular_book");
-                int mostPopularBookCount = rs.getInt("most_popular_book_count");
-                String mostPopularGenre = rs.getString("most_popular_genre");
-                String mostPopularAuthor = rs.getString("most_popular_author");
-                int totalUsers = rs.getInt("total_users");
-                int totalBooks = rs.getInt("total_books");
-                int totalBorrows = rs.getInt("total_borrows");
-                BufferedWriter writer = new BufferedWriter(new FileWriter("report.txt"));
-                writer.write("Library Statistics:\n");
-                writer.write("=====================================\n");
-                writer.write("Most popular book: " + mostPopularBook + " (" + mostPopularBookCount + " borrows)\n");
-                writer.write("Most popular genre: " + mostPopularGenre + "\n");
-                writer.write("Most popular author: " + mostPopularAuthor + "\n");
-                writer.write("Total users: " + totalUsers + "\n");
-                writer.write("Total books: " + totalBooks + "\n");
-                writer.write("Total borrows: " + totalBorrows + "\n");
-                writer.close();
-            } catch (Exception ex) {
-                ex.printStackTrace();
-            }
+        String query = "SELECT " + 
+                    "    (SELECT books.book_name " + 
+                    "     FROM borrowing " + 
+                    "     JOIN books ON borrowing.book_id = books.book_id " + 
+                    "     GROUP BY books.book_id, books.book_name " + 
+                    "     ORDER BY COUNT(borrowing.book_id) DESC " + 
+                    "     LIMIT 1) AS most_popular_book, " + 
+                    "    (SELECT COUNT(borrowing.book_id) " + 
+                    "     FROM borrowing " + 
+                    "     GROUP BY borrowing.book_id " + 
+                    "     ORDER BY COUNT(borrowing.book_id) DESC " + 
+                    "     LIMIT 1) AS most_popular_book_count, " +
+                    "(SELECT books.genre " + 
+                    "     FROM borrowing " + 
+                    "     JOIN books ON borrowing.book_id = books.book_id " + 
+                    "     GROUP BY books.genre " + 
+                    "     ORDER BY COUNT(borrowing.book_id) DESC " + 
+                    "     LIMIT 1) AS most_popular_genre," +
+                    "(SELECT books.author " + 
+                    "     FROM borrowing " + 
+                    "     JOIN books ON borrowing.book_id = books.book_id " + 
+                    "     GROUP BY books.author " + 
+                    "     ORDER BY COUNT(borrowing.book_id) DESC " + 
+                    "     LIMIT 1) AS most_popular_author," +
+                    "    (SELECT COUNT(*) FROM users) AS total_users, " + 
+                    "    (SELECT COUNT(*) FROM books) AS total_books," + 
+                    "    (SELECT COUNT(*) FROM borrowing) AS total_borrows;";
+        try (Connection conn = DatabaseConnection.getConnection();
+        PreparedStatement preparedStatement = conn.prepareStatement(query)) {
+            ResultSet rs = preparedStatement.executeQuery();
+            rs.next();
+            String mostPopularBook = rs.getString("most_popular_book");
+            int mostPopularBookCount = rs.getInt("most_popular_book_count");
+            String mostPopularGenre = rs.getString("most_popular_genre");
+            String mostPopularAuthor = rs.getString("most_popular_author");
+            int totalUsers = rs.getInt("total_users");
+            int totalBooks = rs.getInt("total_books");
+            int totalBorrows = rs.getInt("total_borrows");
+            BufferedWriter writer = new BufferedWriter(new FileWriter("report.txt"));
+            writer.write("Library Statistics:\n");
+            writer.write("=====================================\n");
+            writer.write("Most popular book: " + mostPopularBook + " (" + mostPopularBookCount + " borrows)\n");
+            writer.write("Most popular genre: " + mostPopularGenre + "\n");
+            writer.write("Most popular author: " + mostPopularAuthor + "\n");
+            writer.write("Total users: " + totalUsers + "\n");
+            writer.write("Total books: " + totalBooks + "\n");
+            writer.write("Total borrows: " + totalBorrows + "\n");
+            writer.close();
+        } catch (Exception ex) {
+            ex.printStackTrace();
+        }
     }
 }
