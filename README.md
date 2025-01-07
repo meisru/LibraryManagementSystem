@@ -5,7 +5,7 @@ A simple application for an online library system using Java Swing and PostgresS
 
 ## Screenshots:
 ### Login | Register Page:
-![Login Page Screenshot](assets\screenshots\Login.png)
+![Login Page Screenshot](assets/screenshots/Login.png)
 ![Register Page Screenshot](assets\screenshots\Register.png)
 
 
